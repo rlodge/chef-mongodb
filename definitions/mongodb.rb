@@ -193,11 +193,14 @@ define :mongodb_instance, :mongodb_type => "mongod",
     if Chef::Config[:solo]
       rs_nodes = [node]
     else
+      q = "mongodb_cluster_name:#{replicaset['mongodb']['cluster_name']} AND " +
+          "chef_environment:#{replicaset.chef_environment}"
+      if replicaset['mongodb']['shard_name']
+        q += " AND mongodb_shard_name:#{replicaset['mongodb']['shard_name']}"
+      end
       rs_nodes = search(
-        :node,
-        "mongodb_cluster_name:#{replicaset['mongodb']['cluster_name']} AND \
-         mongodb_shard_name:#{replicaset['mongodb']['shard_name']} AND \
-         chef_environment:#{replicaset.chef_environment}"
+          :node,
+          q
       )
     end
   
