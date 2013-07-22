@@ -38,7 +38,10 @@ class Chef
         end
       end
 
-      connection = get_connection('localhost', node['mongodb']['port'], :op_timeout => 5, :slave_ok => true)
+      connection = nil
+      rescue_connection_failure do
+        connection = get_connection('localhost', node['mongodb']['port'], :op_timeout => 5, :slave_ok => true)
+      end
 
       # Want the node originating the connection to be included in the replicaset
       members << node unless members.any? {|m| m.name == node.name }
@@ -110,6 +113,7 @@ class Chef
         elsif result.fetch("errmsg", nil) =~ %r/(\S+) is already initiated/ || (result.fetch("errmsg", nil) == "already initialized")
           server,port = $1.nil? ? ['localhost',node['mongodb']['port']] : $1.split(":")
           begin
+            Chef::Log.warn("Found already initiate replica set. Connecting to #{server}:#{port}")
             connection = Mongo::Connection.new(server, port, :op_timeout => 5, :slave_ok => true)
           rescue
             abort("Could not connect to database: '#{server}:#{port}'")
@@ -125,9 +129,12 @@ class Chef
             rs_member_ips.collect!{ |member| member['host'] }
             config['version'] += 1
             old_members = config['members'].collect{ |member| member['host'] }
-            members_delete = old_members - rs_members
+
+            rs_member_hosts = rs_members.collect{ |member| member['host']}
+
+            members_delete = old_members - rs_member_hosts
             config['members'] = config['members'].delete_if{ |m| members_delete.include?(m['host']) }
-            members_add = rs_members - old_members
+            members_add = rs_member_hosts - old_members
             members_add.each do |m|
               max_id += 1
               config['members'] << {"_id" => max_id, "host" => m}
@@ -145,6 +152,7 @@ class Chef
 
             result = nil
             begin
+              Chef::Log.info("Reconfiguring replica set with '#{cmd}'.")
               result = admin.command(cmd, :check_response => false)
             rescue Mongo::ConnectionFailure
               # reconfiguring destroys exisiting connections, reconnect
@@ -152,8 +160,12 @@ class Chef
               config = connection['local']['system']['replset'].find_one({"_id" => name})
               Chef::Log.info("New config successfully applied: #{config.inspect}")
             end
+            if !result.fetch("errmsg", nil).nil?
+              Chef::Log.error("Failed to configure replicaset, reason: #{result.inspect}")
+            end
             if !result.nil?
-              Chef::Log.info("configuring replicaset returned: #{result.inspect}")
+              Chef::Log.info
+              ("configuring replicaset returned: #{result.inspect}")
             end
           end
         elsif !result.fetch("errmsg", nil).nil?
@@ -267,14 +279,19 @@ class Chef
     end
 
     # Ensure retry upon failure
-    def self.rescue_connection_failure(max_retries=30)
+    def self.rescue_connection_failure(max_retries=12,max_sleep=80)
       retries = 0
+      sleep = 5
       begin
         yield
       rescue Mongo::ConnectionFailure => ex
+        Chef::Log.warn("Retry #{retries} for connect to mongodb failed; will try #{max_retries - retries} more times.  Sleeping #{sleep} and trying again")
         retries += 1
         raise ex if retries > max_retries
-        sleep(0.5)
+        sleep(sleep)
+        if sleep * 2 <= max_sleep
+          sleep = sleep * 2
+        end
         retry
       end
     end
@@ -307,12 +324,7 @@ class Chef
       slave_ok        = opts[:slave_ok] || false
       connect_timeout = opts[:connect_timeout] || nil
 
-      begin
-        Mongo::Connection.new(host, port, :op_timeout => op_timeout, :slave_ok => slave_ok, :connect_timeout => connect_timeout)
-      rescue Exception => e
-        Chef::Log.warn("Could not connect to database: '#{host}:#{port}', reason #{e}")
-        return
-      end
+      Mongo::Connection.new(host, port, :op_timeout => op_timeout, :slave_ok => slave_ok, :connect_timeout => connect_timeout)
     end
 
   end
