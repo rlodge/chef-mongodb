@@ -23,13 +23,14 @@ define :mongodb_instance, :mongodb_type => "mongod",
        :action => [:enable, :start], :bind_ip => nil, :port => 27017, 
        :logpath => "/var/log/mongodb", :dbpath => "/data",
        :configserver => [], :replicaset => nil, :enable_rest => false,
-       :smallfiles => false, :notifies => [], :auth => false do
+       :smallfiles => false, :notifies => [], :auth => false,
+       :service_action => [:enable, :start] do
     
   include_recipe "mongodb::default"
   
   name = params[:name]
   type = params[:mongodb_type]
-  service_action = params[:action]
+  service_action = params[:service_action]
   service_notifies = params[:notifies]
   
   bind_ip = params[:bind_ip]
@@ -83,7 +84,7 @@ define :mongodb_instance, :mongodb_type => "mongod",
   else
     daemon = "/usr/bin/mongos"
     dbpath = nil
-    configserver = configserver_nodes.collect{|n| "#{n['fqdn']}:#{n['mongodb']['port']}" }.join(",")
+    configserver = configserver_nodes.collect{|n| "#{n['fqdn']}:#{n['mongodb']['port']}" }.sort.join(",")
   end
 
   if replicaset_name and node['mongodb']['keyfile']
@@ -127,8 +128,8 @@ define :mongodb_instance, :mongodb_type => "mongod",
       "logpath" => logfile,
       "dbpath" => dbpath,
       "replicaset_name" => replicaset_name,
-      "configsrv" => false, #type == "configserver", this might change the port
-      "shardsrv" => false,  #type == "shard", dito.
+      "configsrv" => type == "configserver",
+      "shardsrv" => false,#type == "shard",
       "nojournal" => nojournal,
       "enable_rest" => params[:enable_rest],
       "smallfiles" => params[:smallfiles],
@@ -180,7 +181,7 @@ define :mongodb_instance, :mongodb_type => "mongod",
       notifies :create, "ruby_block[config_replicaset]"
     end
     if type == "mongos" && node['mongodb']['auto_configure']['sharding']
-      notifies :create, "ruby_block[config_sharding]", :immediately
+      notifies :create, "ruby_block[config_sharding]"
     end
     if name == "mongodb"
       # we don't care about a running mongodb service in these cases, all we need is stopping it
@@ -221,16 +222,18 @@ define :mongodb_instance, :mongodb_type => "mongod",
     
     shard_nodes = search(
       :node,
-      "mongodb_cluster_name:#{node['mongodb']['cluster_name']} AND \
-       recipes:mongodb\\:\\:shard AND \
-       chef_environment:#{node.chef_environment}"
+      "mongodb_cluster_name:#{node['mongodb']['cluster_name']} AND " +
+        "mongodb_shard_name:*? AND " +
+        "chef_environment:#{node.chef_environment}"
     )
     
     ruby_block "config_sharding" do
       block do
         if type == "mongos"
           Chef::MongoDB.configure_shards(node, shard_nodes)
-          Chef::MongoDB.configure_sharded_collections(node, node['mongodb']['sharded_collections'])
+          if node['mongodb']['sharded_databases']
+            Chef::MongoDB.configure_sharded_collections(node, node['mongodb']['sharded_databases'])
+          end
         end
       end
       action :nothing

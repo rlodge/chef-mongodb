@@ -182,7 +182,7 @@ class Chef
       shard_groups = Hash.new{|h,k| h[k] = []}
 
       shard_nodes.each do |n|
-        if n['recipes'].include?('mongodb::replicaset')
+        if !n['mongodb']['shard_name'].nil?
           key = "rs_#{n['mongodb']['shard_name']}"
         else
           key = '_single'
@@ -201,7 +201,10 @@ class Chef
       end
       Chef::Log.info(shard_members.inspect)
 
-      connection = get_connection('localhost', node['mongodb']['port'], :op_timeout => 5)
+      connection = nil
+      rescue_connection_failure do
+        connection = get_connection('localhost', node['mongodb']['port'], :op_timeout => 5)
+      end
 
       admin = connection['admin']
 
@@ -218,7 +221,7 @@ class Chef
     end
 
 
-    def self.configure_sharded_collections(node, sharded_collections)
+    def self.configure_sharded_collections(node, sharded_databases)
       # lazy require, to move loading this modules to runtime of the cookbook
       require 'rubygems'
       require 'mongo'
@@ -227,7 +230,7 @@ class Chef
 
       admin = connection['admin']
 
-      databases = sharded_collections.keys.collect{ |x| x.split(".").first}.uniq
+      databases = sharded_databases.keys
       Chef::Log.info("enable sharding for these databases: '#{databases.inspect}'")
 
       databases.each do |db_name|
@@ -252,27 +255,31 @@ class Chef
         end
       end
 
-      sharded_collections.each do |name, key|
-        cmd = BSON::OrderedHash.new
-        cmd['shardcollection'] = name
-        cmd['key'] = {key => 1}
-        begin
-          result = admin.command(cmd, :check_response => false)
-        rescue Mongo::OperationTimeout
-          result = "sharding '#{name}' on key '#{key}' timed out, run the recipe again to check the result"
-        end
-        if result['ok'] == 0
-          # some error
-          errmsg = result.fetch("errmsg")
-          if errmsg == "already sharded"
-            Chef::Log.info("Sharding is already configured for collection '#{name}', doing nothing")
-          else
-            Chef::Log.error("Failed to shard collection #{name}, result was: #{result.inspect}")
-          end
+      sharded_databases.each do |dbName, sharding|
+        if sharding.is_a?(Hash)
+          sharding.each do |collection, key|
+            cmd = BSON::OrderedHash.new
+            cmd['shardcollection'] = "#{dbName}.#{collection}"
+            cmd['key'] = {key => 1}
+            begin
+              result = admin.command(cmd, :check_response => false)
+            rescue Mongo::OperationTimeout
+              result = "sharding '#{dbName}.#{collection}' on key '#{key}' timed out, run the recipe again to check the result"
+            end
+            if result['ok'] == 0
+              # some error
+              errmsg = result.fetch("errmsg")
+              if errmsg == "already sharded"
+                Chef::Log.info("Sharding is already configured for collection '#{dbName}.#{collection}', doing nothing")
+              else
+                Chef::Log.error("Failed to shard collection #{dbName}.#{collection}, result was: #{result.inspect}")
+              end
 
-        else
-          # success
-          Chef::Log.info("Sharding for collection '#{result['collectionsharded']}' enabled")
+            else
+              # success
+              Chef::Log.info("Sharding for collection '#{result['collectionsharded']}' enabled")
+            end
+          end
         end
       end
 
