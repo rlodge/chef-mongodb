@@ -182,7 +182,7 @@ class Chef
       shard_groups = Hash.new{|h,k| h[k] = []}
 
       shard_nodes.each do |n|
-        if !n['mongodb']['shard_name'].nil?
+        if !n['mongodb']['replicaset_name'].nil?
           key = "rs_#{n['mongodb']['shard_name']}"
         else
           key = '_single'
