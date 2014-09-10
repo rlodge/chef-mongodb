@@ -25,7 +25,9 @@ package node[:mongodb][:package_name] do
 end
 
 chef_gem 'bson_ext'
-chef_gem 'mongo'
+chef_gem 'mongo'do
+  version '1.10.2'
+end
 
 if node.recipe?("mongodb::default") or node.recipe?("mongodb")
   # configure default instance
