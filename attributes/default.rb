@@ -66,7 +66,7 @@ when "freebsd"
 
 when "rhel","fedora"
   default[:mongodb][:defaults_dir] = "/etc/sysconfig"
-  default[:mongodb][:package_name] = "mongo-10gen-server"
+  default[:mongodb][:package_name] = "mongodb-org-server"
   default[:mongodb][:user] = "mongod"
   default[:mongodb][:group] = "mongod"
   default[:mongodb][:init_script_template] = "redhat-mongodb.init.erb"
@@ -74,7 +74,7 @@ when "rhel","fedora"
 else
   default[:mongodb][:defaults_dir] = "/etc/default"
   default[:mongodb][:root_group] = "root"
-  default[:mongodb][:package_name] = "mongodb-10gen"
+  default[:mongodb][:package_name] = "mongodb-org-server"
   default[:mongodb][:apt_repo] = "debian-sysvinit"
 
 end
