@@ -20,32 +20,30 @@
 #
 
 define :mongodb_instance, :mongodb_type => "mongod",
-       :action => [:enable, :start], :bind_ip => nil, :port => 27017, 
+       :action => [:enable, :start], :bind_ip => nil, :port => 27017,
        :logpath => "/var/log/mongodb", :dbpath => "/data",
        :configserver => [], :replicaset => nil, :enable_rest => false,
        :smallfiles => false, :notifies => [], :auth => false,
        :service_action => [:enable, :start] do
-    
-  include_recipe "mongodb::default"
-  
+
   name = params[:name]
   type = params[:mongodb_type]
   service_action = params[:service_action]
   service_notifies = params[:notifies]
-  
+
   bind_ip = params[:bind_ip]
   port = params[:port]
 
   logpath = params[:logpath]
   logfile = "#{logpath}/#{name}.log"
-  
+
   dbpath = params[:dbpath]
-  
+
   configfile = node['mongodb']['configfile']
   configserver_nodes = params[:configserver]
 
   auth = params[:auth]
-  
+
   replicaset = params[:replicaset]
 
   nojournal = node['mongodb']['nojournal']
@@ -73,11 +71,11 @@ define :mongodb_instance, :mongodb_type => "mongod",
       end
     end
   end
- 
+
   if !["mongod", "shard", "configserver", "mongos"].include?(type)
     raise "Unknown mongodb type '#{type}'"
   end
-  
+
   if type != "mongos"
     daemon = "/usr/bin/mongod"
     configserver = nil
@@ -101,7 +99,7 @@ define :mongodb_instance, :mongodb_type => "mongod",
       Chef::Application.fatal!("You must set the keyfile contents to enable auth and replication!")
     end
 
-    template keyfile do 
+    template keyfile do
       action :create
       source "mongodb.keyfile.erb"
       group node['mongodb']['root_group']
@@ -109,7 +107,7 @@ define :mongodb_instance, :mongodb_type => "mongod",
       mode "0644"
     end
   end
- 
+
   # default file
   template "#{node['mongodb']['defaults_dir']}/#{name}" do
     action :create
@@ -146,7 +144,7 @@ define :mongodb_instance, :mongodb_type => "mongod",
     action :create
     recursive true
   end
-  
+
   if type != "mongos"
     # dbpath dir [make sure it exists]
     directory dbpath do
@@ -157,7 +155,7 @@ define :mongodb_instance, :mongodb_type => "mongod",
       recursive true
     end
   end
-  
+
   # init script
   template "#{node['mongodb']['init_dir']}/#{name}" do
     action :create
@@ -169,7 +167,7 @@ define :mongodb_instance, :mongodb_type => "mongod",
     variables :provides => name
     notifies :restart, "service[#{name}]"
   end
-  
+
   # service
   service name do
     supports :status => true, :restart => true
@@ -188,7 +186,7 @@ define :mongodb_instance, :mongodb_type => "mongod",
       ignore_failure true
     end
   end
-  
+
   # replicaset
   if !replicaset_name.nil? && node['mongodb']['auto_configure']['replicaset']
     if Chef::Config[:solo]
@@ -204,7 +202,7 @@ define :mongodb_instance, :mongodb_type => "mongod",
           q
       )
     end
-  
+
     ruby_block "config_replicaset" do
       block do
         if not replicaset.nil?
@@ -214,19 +212,19 @@ define :mongodb_instance, :mongodb_type => "mongod",
       action :nothing
     end
   end
-  
+
   # sharding
   if type == "mongos" && node['mongodb']['auto_configure']['sharding']
     # add all shards
     # configure the sharded collections
-    
+
     shard_nodes = search(
       :node,
       "mongodb_cluster_name:#{node['mongodb']['cluster_name']} AND " +
         "mongodb_shard_name:*? AND " +
         "chef_environment:#{node.chef_environment}"
     )
-    
+
     ruby_block "config_sharding" do
       block do
         if type == "mongos"
@@ -240,4 +238,3 @@ define :mongodb_instance, :mongodb_type => "mongod",
     end
   end
 end
-

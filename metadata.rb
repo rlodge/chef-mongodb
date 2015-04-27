@@ -3,7 +3,7 @@ maintainer        "edelight GmbH"
 maintainer_email  "markus.korn@edelight.de"
 license           "Apache 2.0"
 description       "Installs and configures mongodb"
-version           "0.14.3"
+version           "0.14.4"
 
 recipe "mongodb", "Installs and configures a single node mongodb instance"
 recipe "mongodb::10gen_repo", "Adds the 10gen repo to get the latest packages"
@@ -76,11 +76,11 @@ attribute "mongodb/replicaset_name",
 attribute "mongodb/enable_rest",
   :display_name => "Enable Rest",
   :description => "Enable the ReST interface of the webserver"
-  
+
 attribute "mongodb/smallfiles",
   :display_name => "Use small files",
   :description => "Modify MongoDB to use a smaller default data file size"
-  
+
 attribute "mongodb/bind_ip",
   :display_name => "Bind address",
   :description => "MongoDB instance bind address",
