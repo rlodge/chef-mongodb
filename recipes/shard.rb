@@ -22,7 +22,7 @@
 include_recipe "mongodb::default"
 
 # disable and stop the default mongodb instance
-service "mongodb" do
+service "mongod" do
   supports :status => true, :restart => true
   action [:disable, :stop]
 end

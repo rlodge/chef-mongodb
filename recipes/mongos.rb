@@ -21,7 +21,7 @@
 
 include_recipe "mongodb"
 
-service "mongodb" do
+service "mongod" do
   action [:disable, :stop]
 end
 
