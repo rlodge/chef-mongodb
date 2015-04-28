@@ -19,7 +19,8 @@
 # limitations under the License.
 #
 
-include_recipe "mongodb"
+#Removed to stop the mongod service from being created.
+#include_recipe "mongodb"
 
 service "mongod" do
   action [:disable, :stop]
