@@ -22,7 +22,6 @@
 include_recipe "mongodb"
 
 service "mongod" do
-  supports :status => true, :restart => true
   action [:disable, :stop]
 end
 
