@@ -26,6 +26,19 @@ service "mongod" do
   action [:disable, :stop]
 end
 
+if not node['mongodb']['dbpath'].empty?
+  directory node['mongodb']['dbpath'] do
+    owner 'mongodb'
+    group 'mongodb'
+    recursive true
+    mode '0755'
+    action :create
+  end
+  execute "set ownership" do
+    command "chown -Rf mongodb:mongodb #{node['mongodb']['dbpath']}"
+  end
+end
+
 # we are not starting the configserver service with the --configsvr
 # commandline option because right now this only changes the port it's
 # running on, and we are overwriting this port anyway.

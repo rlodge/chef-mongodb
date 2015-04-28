@@ -66,13 +66,13 @@ Simply add
 ```ruby
 include_recipe "mongodb::default"
 ```
-  
+
 to your recipe. This will run the mongodb instance as configured by your distribution.
 You can change the dbpath, logpath and port settings (see ATTRIBUTES) for this node by
 using the `mongodb_instance` definition:
 
 ```ruby
-mongodb_instance "mongodb" do
+mongodb_instance "mongod" do
   port node['application']['port']
 end
 ```
@@ -86,7 +86,7 @@ mongodb_instance "my_instance" do
   dbpath "/data/"
 end
 ```
-  
+
 The result is a new system service with
 
 ```shell
@@ -131,7 +131,7 @@ attribute `mongodb[:sharded_collections]`:
   }
 }
 ```
-  
+
 Now mongos will automatically enable sharding for the "test" and the "mydatabase"
 database. Also the "addressbook" and the "calendar" collection will be sharded,
 with sharding key "name" resp. "date".
@@ -142,7 +142,7 @@ This is esp. important when you want to replicate shards.
 
 ## Sharding + Replication
 
-The setup is not much different to the one described above. All you have to do is adding the 
+The setup is not much different to the one described above. All you have to do is adding the
 `mongodb::replicaset` recipe to all shard nodes, and make sure that all shard
 nodes which should be in the same replicaset have the same shard name.
 
