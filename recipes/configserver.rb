@@ -22,8 +22,14 @@
 #Removed to stop the mongod service from being created.
 #include_recipe "mongodb"
 
-service "mongod" do
-  action [:disable, :stop]
+package node[:mongodb][:package_name] do
+  action :install
+  version node[:mongodb][:package_version]
+end
+
+chef_gem 'bson_ext'
+chef_gem 'mongo'do
+  version '1.10.2'
 end
 
 if not node['mongodb']['dbpath'].empty?
